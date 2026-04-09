@@ -1,5 +1,9 @@
 const url = "magazine.pdf";
 
+// ✅ ADD THIS LINE (IMPORTANT FIX)
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js";
+
 document.getElementById("downloadBtn").href = url;
 
 let pdfDoc = null;
