@@ -1,0 +1,41 @@
+body {
+  font-family: Arial;
+  text-align: center;
+  background: #1e1e1e;
+  color: white;
+}
+
+h1 {
+  margin: 15px;
+}
+
+.controls {
+  margin: 10px;
+}
+
+button, a {
+  margin: 5px;
+  padding: 8px 12px;
+  border: none;
+  background: #ff9800;
+  color: white;
+  cursor: pointer;
+  border-radius: 5px;
+  text-decoration: none;
+}
+
+#flipbook {
+  width: 95%;
+  max-width: 1000px;
+  height: 650px;
+  margin: auto;
+}
+
+.page {
+  background: white;
+}
+
+canvas {
+  width: 100%;
+  height: auto;
+}
