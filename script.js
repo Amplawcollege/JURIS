@@ -1,68 +1,175 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JURIS E-Magazine — AMPLC</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="icon" href="data:,">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+// ─── CONFIG ───────────────────────────────────────────────
+const PDF_URL = "magazine.pdf";
 
-  <!-- jQuery FIRST -->
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <!-- PDF.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
-  <!-- Turn.js (pinned version) -->
-  <script src="https://cdn.jsdelivr.net/npm/turn.js@4.1.0/turn.min.js"></script>
-</head>
-<body>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js";
 
-  <header>
-    <div class="logo">
-      <span class="logo-amp">AMPLC</span>
-      <span class="logo-sep">|</span>
-      <span class="logo-juris">JURIS</span>
-    </div>
-    <p class="tagline">Legal Magazine &mdash; Vol. 1</p>
-  </header>
+// ─── STATE ────────────────────────────────────────────────
+let pdfDoc        = null;
+let renderedPages = [];       // cache: { canvas, width, height }
+let currentPage   = 1;
+let scale         = window.innerWidth < 768 ? 0.8 : 1.2;
+let flipInitialized = false;
 
-  <div class="controls">
-    <button onclick="prevPage()" aria-label="Previous page">&#8592; Prev</button>
-    <span id="page-num" class="page-indicator">Page 1</span>
-    <button onclick="nextPage()" aria-label="Next page">Next &#8594;</button>
-    <span class="divider"></span>
-    <button onclick="zoomOut()" aria-label="Zoom out">&#8722; Zoom</button>
-    <button onclick="zoomIn()" aria-label="Zoom in">&#43; Zoom</button>
-    <button onclick="goFullscreen()" aria-label="Fullscreen">&#9974; Full</button>
-    <a id="downloadBtn" href="magazine.pdf" download="JURIS-Vol1.pdf" aria-label="Download PDF">&#8595; Download</a>
-  </div>
+// ─── DOM REFS ─────────────────────────────────────────────
+const flipbook   = document.getElementById("flipbook");
+const loadingMsg = document.getElementById("loadingMsg");
+const errorMsg   = document.getElementById("errorMsg");
+const pageNum    = document.getElementById("page-num");
+const rotateMsg  = document.getElementById("rotateMsg");
 
-  <!-- Loading state -->
-  <div id="loadingMsg">
-    <div class="spinner"></div>
-    <p>Loading magazine&hellip;</p>
-  </div>
+// ─── LOAD PDF ─────────────────────────────────────────────
+pdfjsLib.getDocument(PDF_URL).promise
+  .then(async (pdf) => {
+    pdfDoc = pdf;
+    await renderAllPages(pdf);
+    buildFlipbook();
+    setTimeout(initFlipbook, 1000);
+    loadingMsg.style.display = "none";
+  })
+  .catch((err) => {
+    console.error("PDF load error:", err);
+    loadingMsg.style.display = "none";
+    errorMsg.style.display   = "block";
+  });
 
-  <!-- Error state -->
-  <div id="errorMsg" style="display:none;">
-    <p>&#9888; Could not load the magazine. Please check your connection and try again.</p>
-    <button onclick="location.reload()">Retry</button>
-  </div>
+// ─── RENDER ALL PAGES (cached) ────────────────────────────
+async function renderAllPages(pdf) {
+  renderedPages = [];
+  flipbook.innerHTML = "";
 
-  <!-- Rotate message (portrait mobile) -->
-  <div id="rotateMsg" aria-live="polite">
-    <div class="rotate-inner">
-      <div class="rotate-icon">&#8635;</div>
-      <p>Rotate to landscape for the best experience</p>
-    </div>
-  </div>
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page     = await pdf.getPage(i);
+    const viewport = page.getViewport({ scale });
 
-  <main>
-    <div id="flipbook"></div>
-  </main>
+    const canvas  = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    canvas.width  = viewport.width;
+    canvas.height = viewport.height;
+    canvas.style.width  = "100%";
+    canvas.style.height = "auto";
 
-  <audio id="flipSound" src="flip.mp3" preload="auto"></audio>
+    await page.render({ canvasContext: context, viewport }).promise;
 
-  <script src="script.js"></script>
-</body>
-</html>
+    renderedPages.push({
+      canvas: canvas.cloneNode(true),   // store for re-use on zoom
+      width:  viewport.width,
+      height: viewport.height
+    });
+
+    const div = document.createElement("div");
+    div.className = "page";
+    div.appendChild(canvas);
+    flipbook.appendChild(div);
+  }
+}
+
+// ─── BUILD FLIPBOOK DOM ───────────────────────────────────
+function buildFlipbook() {
+  flipbook.innerHTML = "";
+  renderedPages.forEach(({ canvas }) => {
+    const div = document.createElement("div");
+    div.className = "page";
+    div.appendChild(canvas.cloneNode(true));
+    flipbook.appendChild(div);
+  });
+}
+
+// ─── INIT TURN.JS ─────────────────────────────────────────
+function initFlipbook() {
+  if (flipInitialized) return;
+  const isMobile = window.innerWidth < 768;
+
+  $(flipbook).turn({
+    width:    isMobile ? window.innerWidth - 20 : 1000,
+    height:   isMobile ? 480 : 650,
+    autoCenter: true,
+    display:  isMobile ? "single" : "double",
+    gradients: true,
+    elevation: 50,
+    when: {
+      turning: function (e, page) {
+        currentPage = page;
+        pageNum.textContent = "Page " + page + " / " + pdfDoc.numPages;
+        playFlipSound();
+      }
+    }
+  });
+
+  flipInitialized = true;
+}
+
+// ─── NAVIGATION ───────────────────────────────────────────
+function nextPage()  { $(flipbook).turn("next"); }
+function prevPage()  { $(flipbook).turn("previous"); }
+
+// ─── SOUND ────────────────────────────────────────────────
+function playFlipSound() {
+  const sound = document.getElementById("flipSound");
+  if (!sound) return;
+  sound.currentTime = 0;
+  sound.volume = 0.5;
+  sound.play().catch(() => {});
+}
+
+// ─── ZOOM (no full PDF re-download) ───────────────────────
+async function zoomIn()  { await applyZoom(scale + 0.2); }
+async function zoomOut() { await applyZoom(Math.max(0.5, scale - 0.2)); }
+
+async function applyZoom(newScale) {
+  if (!pdfDoc || newScale === scale) return;
+  scale = newScale;
+
+  // Re-render at new scale
+  loadingMsg.style.display = "flex";
+  if (flipInitialized) {
+    $(flipbook).turn("destroy");
+    flipInitialized = false;
+  }
+
+  await renderAllPages(pdfDoc);
+  buildFlipbook();
+  setTimeout(() => {
+    initFlipbook();
+    // Restore page position
+    if (currentPage > 1) $(flipbook).turn("page", currentPage);
+    loadingMsg.style.display = "none";
+  }, 800);
+}
+
+// ─── FULLSCREEN ───────────────────────────────────────────
+function goFullscreen() {
+  if (flipbook.requestFullscreen)       flipbook.requestFullscreen();
+  else if (flipbook.webkitRequestFullscreen) flipbook.webkitRequestFullscreen();
+}
+
+// ─── SWIPE (MOBILE) ───────────────────────────────────────
+let touchStartX = 0;
+
+flipbook.addEventListener("touchstart", (e) => {
+  touchStartX = e.touches[0].clientX;
+}, { passive: true });
+
+flipbook.addEventListener("touchend", (e) => {
+  const delta = touchStartX - e.changedTouches[0].clientX;
+  if (delta >  50) nextPage();
+  if (delta < -50) prevPage();
+}, { passive: true });
+
+// ─── ROTATE MESSAGE (portrait mobile) ─────────────────────
+function checkOrientation() {
+  const isPortraitMobile = window.innerWidth < 768 && window.innerHeight > window.innerWidth;
+  rotateMsg.style.display = isPortraitMobile ? "flex" : "none";
+}
+
+window.addEventListener("orientationchange", () => {
+  setTimeout(checkOrientation, 300);
+});
+window.addEventListener("resize", checkOrientation);
+checkOrientation(); // run on load
+
+// ─── KEYBOARD NAVIGATION ──────────────────────────────────
+document.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") nextPage();
+  if (e.key === "ArrowLeft"  || e.key === "ArrowUp")   prevPage();
+});
