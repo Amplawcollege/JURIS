@@ -1,44 +1,233 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>JURIS Flip Magazine</title>
+/* ─── RESET & BASE ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-<link rel="stylesheet" href="style.css">
-<link rel="icon" href="data:,">
-<!-- jQuery FIRST -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+:root {
+  --bg:        #0f0f0f;
+  --surface:   #1a1a1a;
+  --border:    #2e2e2e;
+  --gold:      #c9952a;
+  --gold-soft: #e8b84b;
+  --text:      #f0ece3;
+  --muted:     #888580;
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body:    'DM Sans', Arial, sans-serif;
+}
 
-<!-- PDF.js -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+html, body {
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+}
 
-<!-- Turn.js -->
-<script src="https://cdn.jsdelivr.net/gh/blasten/turn.js/turn.min.js"></script>
+/* ─── HEADER ───────────────────────────────────────────── */
+header {
+  text-align: center;
+  padding: 28px 16px 12px;
+  border-bottom: 0.5px solid var(--border);
+}
 
-</head>
-<body>
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 28px;
+  letter-spacing: 0.04em;
+}
 
-<h1>📘 JURIS E-Magazine</h1>
+.logo-amp  { color: var(--muted); }
+.logo-sep  { color: var(--border); }
+.logo-juris {
+  color: var(--gold);
+  letter-spacing: 0.12em;
+}
 
-<div class="controls">
-  <button onclick="prevPage()">⬅ Prev</button>
-  <span id="page-num">Page 1</span>
-  <button onclick="nextPage()">Next ➡</button>
-  <button onclick="zoomIn()">🔍 +</button>
-  <button onclick="zoomOut()">🔍 -</button>
-  <button onclick="goFullscreen()">⛶ Fullscreen</button>
-  <a id="downloadBtn" target="_blank">⬇ Download</a>
-</div>
+.tagline {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 6px;
+}
 
-  <div id="rotateMsg">
-  🔄 Please rotate your device to landscape mode for best experience
-</div>
-  
-<div id="flipbook"></div>
+/* ─── CONTROLS ─────────────────────────────────────────── */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+}
 
-<audio id="flipSound" src="flip.mp3"></audio>
+button, .controls a {
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 7px 14px;
+  border: 0.5px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
 
-<script src="script.js"></script>
+button:hover, .controls a:hover {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #0f0f0f;
+}
 
-</body>
-</html>
+button:active {
+  transform: scale(0.97);
+}
+
+.page-indicator {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 0 4px;
+  min-width: 80px;
+  text-align: center;
+}
+
+.divider {
+  width: 0.5px;
+  height: 20px;
+  background: var(--border);
+  display: inline-block;
+  margin: 0 4px;
+}
+
+/* ─── MAIN / FLIPBOOK AREA ─────────────────────────────── */
+main {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 32px 16px 48px;
+  min-height: calc(100vh - 180px);
+}
+
+#flipbook {
+  width: 100%;
+  max-width: 1000px;
+  height: 650px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+}
+
+.page {
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.page canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ─── LOADING STATE ────────────────────────────────────── */
+#loadingMsg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 60px 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--border);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── ERROR STATE ──────────────────────────────────────── */
+#errorMsg {
+  text-align: center;
+  padding: 48px 16px;
+  color: #c0694a;
+}
+
+#errorMsg p { margin-bottom: 16px; font-size: 14px; }
+#errorMsg button {
+  background: #c0694a;
+  border-color: #c0694a;
+  color: white;
+}
+
+/* ─── ROTATE MESSAGE ───────────────────────────────────── */
+#rotateMsg {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 10, 0.97);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 32px;
+}
+
+.rotate-inner { max-width: 280px; }
+
+.rotate-icon {
+  font-size: 40px;
+  margin-bottom: 16px;
+  color: var(--gold);
+  animation: rock 1.4s ease-in-out infinite;
+}
+
+@keyframes rock {
+  0%, 100% { transform: rotate(-20deg); }
+  50%       { transform: rotate(20deg); }
+}
+
+#rotateMsg p {
+  font-size: 16px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+/* ─── RESPONSIVE ───────────────────────────────────────── */
+@media (max-width: 767px) {
+  .logo { font-size: 22px; }
+
+  .controls { gap: 4px; padding: 10px 8px; }
+
+  button, .controls a {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .divider { display: none; }
+
+  #flipbook {
+    height: 480px;
+    max-width: 100%;
+  }
+
+  main { padding: 16px 8px 32px; }
+}
+
+@media (max-width: 400px) {
+  #flipbook { height: 380px; }
+}
+
+/* ─── FULLSCREEN ───────────────────────────────────────── */
+#flipbook:-webkit-full-screen { width: 100vw; height: 100vh; max-width: none; }
+#flipbook:-moz-full-screen    { width: 100vw; height: 100vh; max-width: none; }
+#flipbook:fullscreen           { width: 100vw; height: 100vh; max-width: none; }
