@@ -1,4 +1,5 @@
 const url = "https://drive.google.com/uc?export=download&id=1LnfOV5Z1G0itLRhPqKMfVWwIPqBiBGiB";
+const url = "magazine.pdf";
 
 document.getElementById("downloadBtn").href = url;
 
